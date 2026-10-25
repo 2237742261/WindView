@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">风速</string>
+    <string name="widget_small_name">风速 · 2×2</string>
+    <string name="widget_wide_name">风速 · 4×2</string>
+    <string name="widget_small_desc">当前位置实时风速（轮毂 100 m）</string>
+    <string name="widget_wide_desc">实时风速 + 12 小时折线</string>
+    <string name="widget_chart_desc">未来 12 小时风速折线</string>
+</resources>
