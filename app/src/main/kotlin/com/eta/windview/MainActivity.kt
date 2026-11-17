@@ -664,7 +664,7 @@ private fun HourlyStrip(data: WindData, use100: Boolean) {
                         .padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(h.label.substringBefore(":"), fontSize = 12.sp, color = cs.onSecondaryContainer.copy(alpha = 0.7f))
+                    Text(h.label.substringBefore(":") + "H", fontSize = 12.sp, color = cs.onSecondaryContainer.copy(alpha = 0.7f))
                     Spacer(Modifier.height(6.dp))
                     Text(
                         fmt1(v),
@@ -1002,7 +1002,7 @@ private fun LineChart(
             for (i in labels.indices) {
                 if (i % 4 != 0) continue
                 drawContext.canvas.nativeCanvas.drawText(
-                    labels[i].substringBefore(":") + "时",
+                    labels[i].substringBefore(":") + "H",
                     xAt(i) - 12.dp.toPx(),
                     h - 5.dp.toPx(),
                     axisPaint,
@@ -1047,7 +1047,7 @@ private fun DailyCard(days: List<DayPoint>) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        d.label,
+                        dayLabel(d.date),
                         fontSize = 14.sp,
                         fontWeight = if (open) FontWeight.SemiBold else FontWeight.Normal,
                         color = cs.onTertiaryContainer,

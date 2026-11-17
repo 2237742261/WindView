@@ -377,6 +377,11 @@ internal fun weekLabel(date: String): String = runCatching {
     WEEK_CN[LocalDate.parse(date).dayOfWeek.value - 1]
 }.getOrDefault(date.takeLast(5))
 
+/** 7 日列表用绝对日期（18日），不用「明天/后天」——数据没刷新时分不清是哪天 */
+internal fun dayLabel(date: String): String = runCatching {
+    LocalDate.parse(date).dayOfMonth.toString() + "日"
+}.getOrDefault(date.takeLast(2) + "日")
+
 internal fun fmtCoord(lat: Double, lon: Double): String =
     String.format(Locale.US, "%.3f, %.3f", lat, lon)
 
