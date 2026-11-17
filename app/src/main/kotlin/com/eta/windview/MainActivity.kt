@@ -588,6 +588,7 @@ private fun HeroCard(data: WindData, use100: Boolean) {
         val staleAge = ageMin >= 30
         Text(
             workHint(mainSpeed) + " · 更新 " + fmtAge(data.fetchedAt) +
+                (if (data.alt) " · 备用源" else "") +
                 (if (staleAge) "（没刷新上）" else ""),
             fontSize = 11.sp,
             color = if (staleAge) cs.error else cs.onSurfaceVariant,

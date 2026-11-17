@@ -14,6 +14,8 @@ import java.util.Locale
 
 internal const val API_FORECAST = "https://api.open-meteo.com/v1/forecast"
 internal const val API_GEOCODE = "https://geocoding-api.open-meteo.com/v1/search"
+// 主接口只有一台海外机器，常年整段连不上；这个域名是另一台，给同样的预报数据
+internal const val API_ENSEMBLE = "https://ensemble-api.open-meteo.com/v1/ensemble"
 
 /** 逐小时的点 */
 data class HourPoint(
@@ -51,6 +53,7 @@ data class WindData(
     val hours: List<HourPoint>,
     val days: List<DayPoint>,
     val fetchedAt: Long,
+    val alt: Boolean = false,   // true = 主接口连不上，这份数据来自备用接口（ECMWF IFS025 控制成员）
 )
 
 data class Place(val lat: Double, val lon: Double, val label: String)
@@ -106,14 +109,33 @@ internal const val K3 = 0.793f
 private fun f3(v: Float?): Float? = v?.let { it * K3 }
 
 internal suspend fun fetchWind(lat: Double, lon: Double): WindData = withContext(Dispatchers.IO) {
-    val url = API_FORECAST +
-        "?latitude=" + String.format(Locale.US, "%.4f", lat) +
-        "&longitude=" + String.format(Locale.US, "%.4f", lon) +
+    val pos = String.format(Locale.US, "%.4f", lat) + "&longitude=" + String.format(Locale.US, "%.4f", lon)
+    val mainUrl = API_FORECAST + "?latitude=" + pos +
         "&current=temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m" +
         "&hourly=wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_100m,wind_direction_100m" +
         "&wind_speed_unit=ms&timezone=auto&forecast_days=10"
+    var mainErr: Exception? = null
+    try {
+        return@withContext parseForecast(JSONObject(httpGet(mainUrl)))
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        mainErr = e
+    }
+    // 主接口这条路整段不通时，换同厂商另一个域名（不同机器），取 ECMWF 控制成员的同一批字段
+    val altUrl = API_ENSEMBLE + "?latitude=" + pos +
+        "&hourly=temperature_2m,wind_speed_10m,wind_gusts_10m,wind_direction_10m,wind_speed_100m,wind_direction_100m" +
+        "&models=ecmwf_ifs025&wind_speed_unit=ms&timezone=auto&forecast_days=10"
+    try {
+        return@withContext parseEnsemble(JSONObject(httpGet(altUrl)))
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        throw IllegalStateException((mainErr?.message ?: "主接口失败") + " / 备用接口：" + (e.message ?: "失败"))
+    }
+}
 
-    val root = JSONObject(httpGet(url))
+private fun parseForecast(root: JSONObject): WindData {
     val cur = root.getJSONObject("current")
     val snapshot = Snapshot(
         time = cur.optString("time"),
@@ -122,7 +144,29 @@ internal suspend fun fetchWind(lat: Double, lon: Double): WindData = withContext
         gust10 = f3(cur.f("wind_gusts_10m")),
         dir10 = if (cur.has("wind_direction_10m") && !cur.isNull("wind_direction_10m")) cur.getInt("wind_direction_10m") else null,
     )
+    return buildData(root, snapshot, alt = false)
+}
 
+private fun parseEnsemble(root: JSONObject): WindData {
+    val hourly = root.getJSONObject("hourly")
+    val times = hourly.getJSONArray("time")
+    // ensemble 接口没有 current，取不晚于当前整点的最后一格
+    val nowKey = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH", Locale.US).format(java.util.Date())
+    var idx = 0
+    for (i in 0 until times.length()) {
+        if (times.getString(i).take(13) <= nowKey) idx = i else break
+    }
+    val snapshot = Snapshot(
+        time = times.getString(idx),
+        temp = arrF(hourly, "temperature_2m", idx),
+        speed10 = f3(arrF(hourly, "wind_speed_10m", idx)),
+        gust10 = f3(arrF(hourly, "wind_gusts_10m", idx)),
+        dir10 = arrI(hourly, "wind_direction_10m", idx),
+    )
+    return buildData(root, snapshot, alt = true)
+}
+
+private fun buildData(root: JSONObject, snapshot: Snapshot, alt: Boolean): WindData {
     val hourly = root.getJSONObject("hourly")
     val times = hourly.getJSONArray("time")
     val nowKey = snapshot.time.take(13)
@@ -207,7 +251,7 @@ internal suspend fun fetchWind(lat: Double, lon: Double): WindData = withContext
         )
     }
 
-    WindData(snapshot = snapshot, hours = hours, days = days, fetchedAt = System.currentTimeMillis())
+    return WindData(snapshot = snapshot, hours = hours, days = days, fetchedAt = System.currentTimeMillis(), alt = alt)
 }
 
 internal suspend fun searchPlace(name: String): List<Place> = withContext(Dispatchers.IO) {
@@ -252,6 +296,7 @@ private fun toJson(d: WindData): String {
     val root = JSONObject()
     root.put("v", 2)
     root.put("fetchedAt", d.fetchedAt)
+    root.put("alt", if (d.alt) 1 else 0)
     root.put(
         "snapshot",
         JSONObject().apply {
@@ -366,7 +411,13 @@ private fun fromJson(text: String): WindData {
             ),
         )
     }
-    return WindData(snapshot = snapshot, hours = hours, days = days, fetchedAt = root.optLong("fetchedAt"))
+    return WindData(
+        snapshot = snapshot,
+        hours = hours,
+        days = days,
+        fetchedAt = root.optLong("fetchedAt"),
+        alt = root.optInt("alt", 0) == 1,
+    )
 }
 
 // ---------------- 工具 ----------------
