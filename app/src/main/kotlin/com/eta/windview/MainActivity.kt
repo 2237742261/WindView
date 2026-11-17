@@ -384,14 +384,17 @@ private fun WindApp(
     val cs = MaterialTheme.colorScheme
     val dark = false
     val chartBg = chartContainer(seeds, dark)
+    val bgTop = backgroundTop(seeds, dark)
     val quatBg = quaternaryContainer(seeds, dark)
     val quatFg = onQuaternary(seeds, dark)
 
     Box(
         Modifier
             .fillMaxSize()
-            // 底色一律近白：颜色只留在卡片和强调元素上，整屏才不会糊成一片同色
-            .background(cs.surface),
+            // 顶部浅彩 → 底色：莫奈味就在这层，全部不透明，别用 alpha（会透壁纸）
+            .background(
+                Brush.verticalGradient(listOf(bgTop, cs.background, cs.background)),
+            ),
     ) {
         PullToRefreshBox(
             isRefreshing = refreshing,

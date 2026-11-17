@@ -95,22 +95,22 @@ internal fun schemeFromSeeds(seeds: SeedColors, dark: Boolean): ColorScheme {
     } else {
         // 浅色：底色压到近白，卡片只留一层很淡的色，正文用近墨色——整屏不再糊成一片同色
         lightColorScheme(
-            primary = hsvColor(hp, sp * 0.58f + 0.24f, 0.46f),
+            primary = hsvColor(hp, 0.62f, 0.46f),
             onPrimary = Color.White,
-            primaryContainer = hsvColor(hp, sp * 0.14f + 0.02f, 0.972f),
-            onPrimaryContainer = hsvColor(hp, 0.26f, 0.16f),
-            secondary = hsvColor(hs, ss * 0.55f, 0.44f),
-            secondaryContainer = hsvColor(hs, ss * 0.14f + 0.02f, 0.968f),
-            onSecondaryContainer = hsvColor(hs, 0.24f, 0.15f),
-            tertiary = hsvColor(ht, st * 0.55f, 0.44f),
-            tertiaryContainer = hsvColor(ht, st * 0.13f + 0.02f, 0.965f),
-            onTertiaryContainer = hsvColor(ht, 0.22f, 0.15f),
-            background = hsvColor(hp, sp * 0.04f, 0.996f),
-            onBackground = hsvColor(hp, 0.22f, 0.12f),
-            surface = hsvColor(hp, sp * 0.04f, 0.999f),
-            onSurface = hsvColor(hp, 0.22f, 0.12f),
-            surfaceVariant = hsvColor(hp, sp * 0.05f, 0.99f),
-            onSurfaceVariant = hsvColor(hp, 0.16f, 0.36f),
+            primaryContainer = hsvColor(hp, 0.10f, 0.972f),
+            onPrimaryContainer = hsvColor(hp, 0.35f, 0.16f),
+            secondary = hsvColor(hs, 0.58f, 0.44f),
+            secondaryContainer = hsvColor(hs, 0.10f, 0.975f),
+            onSecondaryContainer = hsvColor(hs, 0.33f, 0.16f),
+            tertiary = hsvColor(ht, 0.58f, 0.44f),
+            tertiaryContainer = hsvColor(ht, 0.09f, 0.970f),
+            onTertiaryContainer = hsvColor(ht, 0.31f, 0.16f),
+            background = hsvColor(hp, 0.26f, 0.905f),
+            onBackground = hsvColor(hp, 0.36f, 0.13f),
+            surface = hsvColor(hp, 0.06f, 0.985f),
+            onSurface = hsvColor(hp, 0.36f, 0.13f),
+            surfaceVariant = hsvColor(hp, 0.10f, 0.975f),
+            onSurfaceVariant = hsvColor(hp, 0.30f, 0.30f),
             error = Color(0xFFB3261E),
         )
     }
@@ -123,6 +123,12 @@ internal fun widgetBarColors(ctx: Context): IntArray {
     val top = AColor.HSVToColor(floatArrayOf(h, 0.34f, 0.54f))
     val bottom = AColor.HSVToColor(floatArrayOf(hue(seeds.tertiary), 0.40f, 0.36f))
     return intArrayOf(top, bottom)
+}
+
+/** 顶部渐变起点：不透明的浅彩，莫奈感来源；绝不能带 alpha——半透明会透出桌面壁纸 */
+internal fun backgroundTop(seeds: SeedColors, dark: Boolean): Color {
+    val hp = hue(seeds.primary)
+    return if (dark) hsvColor(hp, 0.34f, 0.17f) else hsvColor(hp, 0.34f, 0.855f)
 }
 
 /** 折线图卡片底色：同色相但几乎中性，线才看得清 */
