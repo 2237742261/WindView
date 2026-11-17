@@ -356,14 +356,19 @@ private fun WindApp(
 
     LaunchedEffect(locKey, refreshTick) {
         val ll = locKey ?: return@LaunchedEffect
+        var fails = 0
         while (true) {
             onData(DataState.Loading)
             try {
                 onData(DataState.Ready(fetchWind(ll.first, ll.second)))
+                fails = 0
+                delay(5 * 60 * 1000L)
             } catch (e: Exception) {
                 onData(DataState.Failed(e.message ?: "获取失败"))
+                fails++
+                // 线路抖动居多：失败别硬等 5 分钟，15 秒后自己再试，连挂 3 次才回到常规周期
+                delay(if (fails < 3) 15_000L else 5 * 60 * 1000L)
             }
-            delay(5 * 60 * 1000L)
         }
     }
 
@@ -422,8 +427,8 @@ private fun WindApp(
 
                 if (ready != null && refreshError != null) {
                     Text(
-                        "\u5237\u65b0\u5931\u8d25\uff1a" + refreshError + "\u00b7\u663e\u793a " +
-                            fmtTime(ready.snapshot.time) + " \u7684\u6570\u636e",
+                        "\u5237\u65b0\u5931\u8d25\uff1a" + refreshError + " \u00b7\u663e\u793a " +
+                            fmtAge(ready.fetchedAt) + " \u7684\u6570\u636e",
                         fontSize = 11.sp,
                         color = cs.error,
                         modifier = Modifier.padding(top = 6.dp),
@@ -571,10 +576,13 @@ private fun HeroCard(data: WindData, use100: Boolean) {
             )
         }
         Spacer(Modifier.height(6.dp))
+        val ageMin = (System.currentTimeMillis() - data.fetchedAt) / 60000L
+        val staleAge = ageMin >= 30
         Text(
-            workHint(mainSpeed) + " · 更新 " + fmtTime(data.snapshot.time),
+            workHint(mainSpeed) + " · 更新 " + fmtAge(data.fetchedAt) +
+                (if (staleAge) "（没刷新上）" else ""),
             fontSize = 11.sp,
-            color = cs.onSurfaceVariant,
+            color = if (staleAge) cs.error else cs.onSurfaceVariant,
         )
     }
 }

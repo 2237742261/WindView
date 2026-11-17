@@ -61,10 +61,10 @@ internal fun httpGet(url: String): String {
     // 线路偶尔会卡在 connect 阶段（实测一次连不上、下一次就好），所以给一次重试；
     // 超时压短，避免一次失败就把整轮刷新拖到二十秒以上。
     var last: Exception? = null
-    for (attempt in 1..2) {
+    for (attempt in 1..3) {
         val conn = URL(url).openConnection() as HttpURLConnection
-        conn.connectTimeout = 5000
-        conn.readTimeout = 9000
+        conn.connectTimeout = 4000
+        conn.readTimeout = 8000
         conn.setRequestProperty("User-Agent", "WindView/0.6 (Android)")
         try {
             return conn.inputStream.bufferedReader().use { it.readText() }
@@ -73,7 +73,7 @@ internal fun httpGet(url: String): String {
         } finally {
             conn.disconnect()
         }
-        if (attempt < 2) Thread.sleep(700L)
+        if (attempt < 3) Thread.sleep(400L)
     }
     throw last ?: IllegalStateException("网络请求失败")
 }
@@ -380,6 +380,27 @@ internal fun fmtCoord(lat: Double, lon: Double): String =
     String.format(Locale.US, "%.3f, %.3f", lat, lon)
 
 internal fun fmtTime(iso: String): String = if (iso.length >= 16) iso.substring(11, 16) else iso
+
+private val ageClock = java.text.SimpleDateFormat("HH:mm", java.util.Locale.CHINA)
+private val ageDate = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.CHINA)
+private val ageDay = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.CHINA)
+
+/**
+ * 数据新鲜度：按「刚刚 / N 分钟前 / 今天 HH:mm / 昨天 HH:mm / MM-dd HH:mm」说。
+ * 接口里的 current.time 只有整点，直接用它会让人误以为没刷新过。
+ */
+internal fun fmtAge(fetchedAt: Long): String {
+    if (fetchedAt <= 0L) return "未知"
+    val now = System.currentTimeMillis()
+    val diffMin = (now - fetchedAt) / 60000L
+    if (diffMin < 1) return "刚刚"
+    if (diffMin < 60) return "${diffMin} 分钟前"
+    val fDate = java.util.Date(fetchedAt)
+    val sameDay = ageDay.format(fDate) == ageDay.format(java.util.Date(now))
+    if (sameDay) return "今天 " + ageClock.format(fDate)
+    if (diffMin < 48 * 60) return "昨天 " + ageClock.format(fDate)
+    return ageDate.format(fDate)
+}
 
 internal fun fmt1(v: Float?): String =
     if (v == null) "--" else String.format(Locale.US, "%.1f", v)
