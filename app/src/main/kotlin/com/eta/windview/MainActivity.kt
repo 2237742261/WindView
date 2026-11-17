@@ -390,15 +390,8 @@ private fun WindApp(
     Box(
         Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        cs.primaryContainer.copy(alpha = if (dark) 0.40f else 0.55f),
-                        cs.background,
-                        cs.background,
-                    ),
-                ),
-            ),
+            // 底色一律近白：颜色只留在卡片和强调元素上，整屏才不会糊成一片同色
+            .background(cs.surface),
     ) {
         PullToRefreshBox(
             isRefreshing = refreshing,
@@ -665,7 +658,7 @@ private fun HourlyStrip(data: WindData, use100: Boolean) {
                         .padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(h.label.substringBefore(":") + "H", fontSize = 12.sp, color = cs.onSecondaryContainer.copy(alpha = 0.7f))
+                    Text(h.label, fontSize = 12.sp, color = cs.onSecondaryContainer.copy(alpha = 0.7f))
                     Spacer(Modifier.height(6.dp))
                     Text(
                         fmt1(v),
@@ -1003,7 +996,7 @@ private fun LineChart(
             for (i in labels.indices) {
                 if (i % 4 != 0) continue
                 drawContext.canvas.nativeCanvas.drawText(
-                    labels[i].substringBefore(":") + "H",
+                    labels[i].substringBefore(":") + "时",
                     xAt(i) - 12.dp.toPx(),
                     h - 5.dp.toPx(),
                     axisPaint,
@@ -1048,7 +1041,7 @@ private fun DailyCard(days: List<DayPoint>) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        dayLabel(d.date),
+                        weekLabel(d.date),
                         fontSize = 14.sp,
                         fontWeight = if (open) FontWeight.SemiBold else FontWeight.Normal,
                         color = cs.onTertiaryContainer,
