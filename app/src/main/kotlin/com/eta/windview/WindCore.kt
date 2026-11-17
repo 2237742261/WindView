@@ -69,6 +69,7 @@ internal fun httpGet(url: String): String {
         try {
             return conn.inputStream.bufferedReader().use { it.readText() }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             last = e
         } finally {
             conn.disconnect()

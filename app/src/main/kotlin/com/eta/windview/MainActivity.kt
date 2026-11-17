@@ -359,16 +359,24 @@ private fun WindApp(
         var fails = 0
         while (true) {
             onData(DataState.Loading)
+            var waitMs = 5 * 60 * 1000L
             try {
                 onData(DataState.Ready(fetchWind(ll.first, ll.second)))
                 fails = 0
-                delay(5 * 60 * 1000L)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // refreshTick / 位置一变，旧协程就被取消：这是正常收尾，不是刷新失败
+                throw e
             } catch (e: Exception) {
                 onData(DataState.Failed(e.message ?: "获取失败"))
                 fails++
-                // 线路抖动居多：失败别硬等 5 分钟，15 秒后自己再试，连挂 3 次才回到常规周期
-                delay(if (fails < 3) 15_000L else 5 * 60 * 1000L)
+                // 线路会整段几分钟连不上：别回 5 分钟大周期，按 15s/30s/60s 一路追，恢复后一分钟内就补上
+                waitMs = when {
+                    fails <= 1 -> 15_000L
+                    fails <= 3 -> 30_000L
+                    else -> 60_000L
+                }
             }
+            delay(waitMs)
         }
     }
 
@@ -428,7 +436,7 @@ private fun WindApp(
                 if (ready != null && refreshError != null) {
                     Text(
                         "\u5237\u65b0\u5931\u8d25\uff1a" + refreshError + " \u00b7\u663e\u793a " +
-                            fmtAge(ready.fetchedAt) + " \u7684\u6570\u636e",
+                            fmtAge(ready.fetchedAt) + " \u7684\u6570\u636e\uff08\u6b63\u5728\u81ea\u52a8\u91cd\u8bd5\uff09",
                         fontSize = 11.sp,
                         color = cs.error,
                         modifier = Modifier.padding(top = 6.dp),

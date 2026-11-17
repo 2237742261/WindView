@@ -13,8 +13,8 @@ android {
         applicationId = "com.eta.windview"
         minSdk = 35
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.6.9"
+        versionCode = 22
+        versionName = "0.6.11"
     }
 
     signingConfigs {
