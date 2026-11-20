@@ -10,9 +10,7 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -178,8 +176,13 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onRefresh = {
-                        refreshing.value = true
-                        refreshKey.value = refreshKey.value + 1
+                        // 下拉刷新 60 秒冷却：刚刷过就忽略，不转圈也不提示
+                        val now = System.currentTimeMillis()
+                        if (now - lastRefreshAt >= 60_000L) {
+                            lastRefreshAt = now
+                            refreshing.value = true
+                            refreshKey.value = refreshKey.value + 1
+                        }
                     },
                     onPickPlace = { lat, lon, name -> pickPlace(lat, lon, name) },
                     onUseGps = { useGps() },
@@ -200,6 +203,8 @@ class MainActivity : ComponentActivity() {
     }
 
     // ---- 位置 ----
+
+    private var lastRefreshAt = 0L
 
     private fun autoStart() {
         val manual = prefs.getBoolean("manual", false)
@@ -392,8 +397,6 @@ private fun WindApp(
     val cardFgA = cs.onPrimaryContainer
     val cardFgB = cardInk(seeds, dark, 1)
     val bgTop = backgroundTop(seeds, dark)
-    val quatBg = quaternaryContainer(seeds, dark)
-    val quatFg = onQuaternary(seeds, dark)
 
     Box(
         Modifier
@@ -429,6 +432,8 @@ private fun WindApp(
                     },
                     onTap = { showSearch = true },
                 )
+
+                if (ready != null) UpdateHint(ready)
 
                 when {
                     loc is LocState.Failed && ready == null -> HintCard(loc.message) { showSearch = true }
@@ -599,29 +604,38 @@ private fun HeroCard(data: WindData, use100: Boolean) {
             )
         }
         Spacer(Modifier.height(6.dp))
-        val ageMin = (System.currentTimeMillis() - data.fetchedAt) / 60000L
-        val staleAge = ageMin >= 30
-        var showHint by remember(data.fetchedAt) { mutableStateOf(true) }
-        LaunchedEffect(data.fetchedAt, staleAge, data.alt) {
-            showHint = true
-            // 正常时 6 秒后淡出；没刷新上 / 走备用源就常驻，别把警告也藏了
-            if (!staleAge && !data.alt) {
-                delay(6000)
-                showHint = false
-            }
-        }
-        AnimatedVisibility(visible = showHint, enter = fadeIn(), exit = fadeOut()) {
-            Text(
-                workHint(mainSpeed) + " · 更新 " + fmtAge(data.fetchedAt) +
-                    (if (data.alt) " · 备用源" else "") +
-                    (if (staleAge) "（没刷新上）" else ""),
-                fontSize = 11.sp,
-                color = if (staleAge) cs.error else cs.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
+        Text(
+            workHint(mainSpeed),
+            fontSize = 11.sp,
+            color = cs.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun UpdateHint(data: WindData) {
+    val cs = MaterialTheme.colorScheme
+    val ageMin = (System.currentTimeMillis() - data.fetchedAt) / 60000L
+    val staleAge = ageMin >= 30
+    var show by remember(data.fetchedAt) { mutableStateOf(true) }
+    LaunchedEffect(data.fetchedAt, staleAge, data.alt) {
+        show = true
+        // 正常时 3 秒后淡出；没刷新上 / 走备用源就常驻
+        if (!staleAge && !data.alt) {
+            delay(3000)
+            show = false
         }
     }
+    // 只淡透明度、不摘节点：摘掉会让下面的卡片整体往上跳一下
+    val hintAlpha by animateFloatAsState(if (show) 1f else 0f, label = "updateHintAlpha")
+    Text(
+        "更新 " + fmtAge(data.fetchedAt) +
+            (if (data.alt) " · 备用源" else "") +
+            (if (staleAge) "（没刷新上）" else ""),
+        fontSize = 11.sp,
+        color = (if (staleAge) cs.error else cs.onSurfaceVariant).copy(alpha = hintAlpha),
+        modifier = Modifier.padding(top = 2.dp),
+    )
 }
 
 @Composable

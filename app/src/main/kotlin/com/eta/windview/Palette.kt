@@ -131,31 +131,6 @@ internal fun backgroundTop(seeds: SeedColors, dark: Boolean): Color {
     return if (dark) hsvColor(hp, 0.34f, 0.17f) else hsvColor(hp, 0.30f, 0.795f)
 }
 
-/** 折线图卡片底色：同色相但几乎中性，线才看得清 */
-internal fun chartContainer(seeds: SeedColors, dark: Boolean): Color {
-    val hp = hue(seeds.primary)
-    val sp = sat(seeds.primary)
-    return if (dark) {
-        hsvColor(hp, sp * 0.45f, 0.30f)
-    } else {
-        hsvColor(hp, sp * 0.09f + 0.02f, 0.978f)
-    }
-}
-
-/** 第四色：用壁纸的副色，别硬转色相——+62 度那种凑色最容易脏 */
-private fun quatHue(seeds: SeedColors): Float = hue(seeds.secondary)
-
-internal fun quaternaryContainer(seeds: SeedColors, dark: Boolean): Color {
-    val h = quatHue(seeds)
-    val s = sat(seeds.secondary)
-    return if (dark) hsvColor(h, s * 0.55f, 0.40f) else hsvColor(h, s * 0.10f + 0.02f, 0.968f)
-}
-
-internal fun onQuaternary(seeds: SeedColors, dark: Boolean): Color {
-    val h = quatHue(seeds)
-    return if (dark) hsvColor(h, 0.08f, 0.97f) else hsvColor(h, 0.22f, 0.15f)
-}
-
 /** 卡片底色：同一主色相两档交替（浅绿 / 微黄白），比页面底色亮一档才浮得起来 */
 internal fun cardTint(seeds: SeedColors, dark: Boolean, band: Int): Color {
     val h = hue(seeds.primary)
