@@ -97,15 +97,15 @@ internal fun schemeFromSeeds(seeds: SeedColors, dark: Boolean): ColorScheme {
         lightColorScheme(
             primary = hsvColor(hp, 0.62f, 0.46f),
             onPrimary = Color.White,
-            primaryContainer = hsvColor(hp, 0.10f, 0.972f),
-            onPrimaryContainer = hsvColor(hp, 0.35f, 0.16f),
+            primaryContainer = hsvColor(hp, 0.09f, 0.966f),
+            onPrimaryContainer = hsvColor(hp, 0.42f, 0.135f),
             secondary = hsvColor(hs, 0.58f, 0.44f),
-            secondaryContainer = hsvColor(hs, 0.10f, 0.975f),
-            onSecondaryContainer = hsvColor(hs, 0.33f, 0.16f),
+            secondaryContainer = hsvColor(hs, 0.10f, 0.962f),
+            onSecondaryContainer = hsvColor(hs, 0.40f, 0.135f),
             tertiary = hsvColor(ht, 0.58f, 0.44f),
-            tertiaryContainer = hsvColor(ht, 0.09f, 0.970f),
-            onTertiaryContainer = hsvColor(ht, 0.31f, 0.16f),
-            background = hsvColor(hp, 0.26f, 0.905f),
+            tertiaryContainer = hsvColor(ht, 0.09f, 0.966f),
+            onTertiaryContainer = hsvColor(ht, 0.38f, 0.135f),
+            background = hsvColor(hp, 0.26f, 0.855f),
             onBackground = hsvColor(hp, 0.36f, 0.13f),
             surface = hsvColor(hp, 0.06f, 0.985f),
             onSurface = hsvColor(hp, 0.36f, 0.13f),
@@ -128,7 +128,7 @@ internal fun widgetBarColors(ctx: Context): IntArray {
 /** 顶部渐变起点：不透明的浅彩，莫奈感来源；绝不能带 alpha——半透明会透出桌面壁纸 */
 internal fun backgroundTop(seeds: SeedColors, dark: Boolean): Color {
     val hp = hue(seeds.primary)
-    return if (dark) hsvColor(hp, 0.34f, 0.17f) else hsvColor(hp, 0.34f, 0.855f)
+    return if (dark) hsvColor(hp, 0.34f, 0.17f) else hsvColor(hp, 0.30f, 0.795f)
 }
 
 /** 折线图卡片底色：同色相但几乎中性，线才看得清 */
@@ -138,7 +138,7 @@ internal fun chartContainer(seeds: SeedColors, dark: Boolean): Color {
     return if (dark) {
         hsvColor(hp, sp * 0.45f, 0.30f)
     } else {
-        hsvColor(hp, sp * 0.045f, 0.991f)
+        hsvColor(hp, sp * 0.09f + 0.02f, 0.978f)
     }
 }
 
@@ -148,10 +148,30 @@ private fun quatHue(seeds: SeedColors): Float = hue(seeds.secondary)
 internal fun quaternaryContainer(seeds: SeedColors, dark: Boolean): Color {
     val h = quatHue(seeds)
     val s = sat(seeds.secondary)
-    return if (dark) hsvColor(h, s * 0.55f, 0.40f) else hsvColor(h, s * 0.13f + 0.02f, 0.966f)
+    return if (dark) hsvColor(h, s * 0.55f, 0.40f) else hsvColor(h, s * 0.10f + 0.02f, 0.968f)
 }
 
 internal fun onQuaternary(seeds: SeedColors, dark: Boolean): Color {
     val h = quatHue(seeds)
     return if (dark) hsvColor(h, 0.08f, 0.97f) else hsvColor(h, 0.22f, 0.15f)
+}
+
+/** 卡片底色：同一主色相两档交替（浅绿 / 微黄白），比页面底色亮一档才浮得起来 */
+internal fun cardTint(seeds: SeedColors, dark: Boolean, band: Int): Color {
+    val h = hue(seeds.primary)
+    return if (dark) {
+        if (band == 0) hsvColor(h, 0.30f, 0.24f) else hsvColor(h + 10f, 0.24f, 0.30f)
+    } else {
+        if (band == 0) hsvColor(h, 0.07f, 0.978f) else hsvColor(h + 20f, 0.10f, 0.988f)
+    }
+}
+
+/** 卡片文字色：深底用亮字，浅底用深字 */
+internal fun cardInk(seeds: SeedColors, dark: Boolean, band: Int): Color {
+    val h = hue(seeds.primary)
+    return if (dark) {
+        hsvColor(h, 0.06f, 0.97f)
+    } else {
+        if (band == 0) hsvColor(h, 0.07f, 0.975f) else hsvColor(h, 0.42f, 0.135f)
+    }
 }

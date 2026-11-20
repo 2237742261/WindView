@@ -10,6 +10,9 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -58,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -383,7 +387,10 @@ private fun WindApp(
     val ready = (data as? DataState.Ready)?.data
     val cs = MaterialTheme.colorScheme
     val dark = false
-    val chartBg = chartContainer(seeds, dark)
+    val cardBgA = cardTint(seeds, dark, 0)
+    val cardBgB = cardTint(seeds, dark, 1)
+    val cardFgA = cs.onPrimaryContainer
+    val cardFgB = cardInk(seeds, dark, 1)
     val bgTop = backgroundTop(seeds, dark)
     val quatBg = quaternaryContainer(seeds, dark)
     val quatFg = onQuaternary(seeds, dark)
@@ -407,7 +414,7 @@ private fun WindApp(
                     .windowInsetsPadding(WindowInsets.systemBars)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 18.dp)
-                    .padding(bottom = 108.dp),
+                    .padding(bottom = 168.dp),
             ) {
                 LocationBar(
                     title = when (loc) {
@@ -442,13 +449,13 @@ private fun WindApp(
                 if (ready != null) {
                     HeroCard(ready, use100)
                     Spacer(Modifier.height(14.dp))
-                    HourlyStrip(ready, use100)
+                    HourlyStrip(ready, use100, cardBgA, cardFgA)
                     Spacer(Modifier.height(12.dp))
-                    ChartCard(ready, use100, chartBg)
+                    ChartCard(ready, use100, cardBgB, cardFgB)
                     Spacer(Modifier.height(12.dp))
-                    DailyCard(ready.days)
+                    DailyCard(ready.days, cardBgA, cardFgA)
                     Spacer(Modifier.height(12.dp))
-                    DetailsCard(ready, use100, quatBg, quatFg)
+                    DetailsCard(ready, use100, cardBgB, cardFgB)
                     Spacer(Modifier.height(16.dp))
                     Text(
                         "下拉刷新 · 每 5 分钟自动更新 · 数据源 Open-Meteo（数值天气预报模式输出）",
@@ -560,15 +567,27 @@ private fun HeroCard(data: WindData, use100: Boolean) {
             )
         }
         Text("${dirName(dir)}风 ${dir ?: "--"}°", fontSize = 15.sp, color = cs.onBackground)
+        Spacer(Modifier.height(3.dp))
+        Text(
+            "当前温度 " + fmt1(data.snapshot.temp) + "°C",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Medium,
+            color = cs.onBackground,
+        )
         Spacer(Modifier.height(2.dp))
         Text(
-            "阵风 ${fmt1(data.snapshot.gust10)} m/s · 气温 ${fmt1(data.snapshot.temp)}°C",
+            "阵风 ${fmt1(data.snapshot.gust10)} m/s · 风功率 ${powerDensity(mainSpeed)} W/m²",
             fontSize = 13.sp,
             color = cs.onSurfaceVariant,
         )
         Spacer(Modifier.height(10.dp))
         Box(
             Modifier
+                .shadow(
+                    6.dp, RoundedCornerShape(50),
+                    ambientColor = Color.Black.copy(alpha = 0.92f),
+                    spotColor = Color.Black.copy(alpha = 0.92f),
+                )
                 .background(cs.secondaryContainer, RoundedCornerShape(50))
                 .padding(horizontal = 14.dp, vertical = 7.dp),
         ) {
@@ -582,13 +601,26 @@ private fun HeroCard(data: WindData, use100: Boolean) {
         Spacer(Modifier.height(6.dp))
         val ageMin = (System.currentTimeMillis() - data.fetchedAt) / 60000L
         val staleAge = ageMin >= 30
-        Text(
-            workHint(mainSpeed) + " · 更新 " + fmtAge(data.fetchedAt) +
-                (if (data.alt) " · 备用源" else "") +
-                (if (staleAge) "（没刷新上）" else ""),
-            fontSize = 11.sp,
-            color = if (staleAge) cs.error else cs.onSurfaceVariant,
-        )
+        var showHint by remember(data.fetchedAt) { mutableStateOf(true) }
+        LaunchedEffect(data.fetchedAt, staleAge, data.alt) {
+            showHint = true
+            // 正常时 6 秒后淡出；没刷新上 / 走备用源就常驻，别把警告也藏了
+            if (!staleAge && !data.alt) {
+                delay(6000)
+                showHint = false
+            }
+        }
+        AnimatedVisibility(visible = showHint, enter = fadeIn(), exit = fadeOut()) {
+            Text(
+                workHint(mainSpeed) + " · 更新 " + fmtAge(data.fetchedAt) +
+                    (if (data.alt) " · 备用源" else "") +
+                    (if (staleAge) "（没刷新上）" else ""),
+                fontSize = 11.sp,
+                color = if (staleAge) cs.error else cs.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -604,7 +636,11 @@ private fun FloatingHeightSwitch(
         modifier
             .windowInsetsPadding(WindowInsets.navigationBars)
             .padding(bottom = 16.dp)
-            .shadow(20.dp, shape)
+            .shadow(
+                10.dp, shape,
+                ambientColor = Color.Black.copy(alpha = 0.95f),
+                spotColor = Color.Black.copy(alpha = 0.95f),
+            )
             .clip(shape)
             .background(cs.primaryContainer, shape)
             .padding(4.dp),
@@ -635,19 +671,38 @@ private fun Pill(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HourlyStrip(data: WindData, use100: Boolean) {
+private fun HourlyStrip(data: WindData, use100: Boolean, bg: Color, fg: Color) {
     val cs = MaterialTheme.colorScheme
     Column(
         Modifier
             .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(22.dp))
-            .background(cs.secondaryContainer, RoundedCornerShape(22.dp))
+            .shadow(
+                7.dp, RoundedCornerShape(22.dp),
+                ambientColor = Color.Black.copy(alpha = 0.95f),
+                spotColor = Color.Black.copy(alpha = 0.95f),
+            )
+            .drawBehind {
+                // Compose 自带的 elevation 阴影在浅色底上几乎看不见：手绘一层往下坠的实影
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.20f),
+                    topLeft = Offset(0f, 6.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(22.dp.toPx()),
+                )
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.14f),
+                    topLeft = Offset(0f, 12.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(22.dp.toPx()),
+                )
+            }
+            .background(bg, RoundedCornerShape(22.dp))
             .padding(vertical = 12.dp),
     ) {
         Text(
             "逐小时风速",
             fontSize = 12.sp,
-            color = cs.onSecondaryContainer.copy(alpha = 0.7f),
+            color = fg.copy(alpha = 0.7f),
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         Spacer(Modifier.height(8.dp))
@@ -661,19 +716,19 @@ private fun HourlyStrip(data: WindData, use100: Boolean) {
                         .padding(vertical = 4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(h.label, fontSize = 12.sp, color = cs.onSecondaryContainer.copy(alpha = 0.7f))
+                    Text(h.label.substringBefore(":").trimStart('0') + ":00", fontSize = 12.sp, color = fg.copy(alpha = 0.85f))
                     Spacer(Modifier.height(6.dp))
                     Text(
                         fmt1(v),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = cs.onSecondaryContainer,
+                        color = fg,
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         dirName(d) + "风",
                         fontSize = 10.sp,
-                        color = cs.onSecondaryContainer.copy(alpha = 0.65f),
+                        color = fg.copy(alpha = 0.8f),
                         maxLines = 1,
                     )
                 }
@@ -683,7 +738,7 @@ private fun HourlyStrip(data: WindData, use100: Boolean) {
 }
 
 @Composable
-private fun ChartCard(data: WindData, use100: Boolean, chartBg: Color) {
+private fun ChartCard(data: WindData, use100: Boolean, chartBg: Color, cardFg: Color) {
     val cs = MaterialTheme.colorScheme
     val hours = data.hours
     val line = if (use100) hours.map { it.speed100 } else hours.map { it.speed10 }
@@ -704,7 +759,26 @@ private fun ChartCard(data: WindData, use100: Boolean, chartBg: Color) {
     Column(
         Modifier
             .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(22.dp))
+            .shadow(
+                7.dp, RoundedCornerShape(22.dp),
+                ambientColor = Color.Black.copy(alpha = 0.95f),
+                spotColor = Color.Black.copy(alpha = 0.95f),
+            )
+            .drawBehind {
+                // Compose 自带的 elevation 阴影在浅色底上几乎看不见：手绘一层往下坠的实影
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.20f),
+                    topLeft = Offset(0f, 6.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(22.dp.toPx()),
+                )
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.14f),
+                    topLeft = Offset(0f, 12.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(22.dp.toPx()),
+                )
+            }
             .background(chartBg, RoundedCornerShape(22.dp))
             .padding(vertical = 14.dp),
     ) {
@@ -714,9 +788,9 @@ private fun ChartCard(data: WindData, use100: Boolean, chartBg: Color) {
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("未来 24 小时", fontSize = 13.sp, color = cs.onSurfaceVariant)
+            Text("未来 24 小时", fontSize = 13.sp, color = cardFg)
             Spacer(Modifier.weight(1f))
-            Text("左右滑动查看", fontSize = 11.sp, color = cs.onSurfaceVariant.copy(alpha = 0.6f))
+            Text("左右滑动查看", fontSize = 11.sp, color = cardFg.copy(alpha = 0.7f))
         }
         Spacer(Modifier.height(2.dp))
         // 当前/选中时刻的值做图例：── 东北风 4.6 m/s　── 阵风 5.2 m/s
@@ -751,7 +825,7 @@ private fun ChartCard(data: WindData, use100: Boolean, chartBg: Color) {
             selection = selIndex,
             onSelect = { selIndex = it },
             accent = cs.primary,
-            sub = cs.onSurfaceVariant,
+            sub = cardFg.copy(alpha = 0.7f),
             secondColor = gustColor,
         )
         if (chartMax >= 25f) {
@@ -999,7 +1073,7 @@ private fun LineChart(
             for (i in labels.indices) {
                 if (i % 4 != 0) continue
                 drawContext.canvas.nativeCanvas.drawText(
-                    labels[i].substringBefore(":") + "时",
+                    labels[i].substringBefore(":").trimStart('0') + ":00",
                     xAt(i) - 12.dp.toPx(),
                     h - 5.dp.toPx(),
                     axisPaint,
@@ -1011,7 +1085,7 @@ private fun LineChart(
 
 // 七日（明天起 7 天），点一行展开当天折线
 @Composable
-private fun DailyCard(days: List<DayPoint>) {
+private fun DailyCard(days: List<DayPoint>, bg: Color, fg: Color) {
     val cs = MaterialTheme.colorScheme
     if (days.isEmpty()) return
     var expanded by remember(days) { mutableStateOf<String?>(null) }
@@ -1021,11 +1095,30 @@ private fun DailyCard(days: List<DayPoint>) {
     Column(
         Modifier
             .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(22.dp))
-            .background(cs.tertiaryContainer, RoundedCornerShape(22.dp))
+            .shadow(
+                7.dp, RoundedCornerShape(22.dp),
+                ambientColor = Color.Black.copy(alpha = 0.95f),
+                spotColor = Color.Black.copy(alpha = 0.95f),
+            )
+            .drawBehind {
+                // Compose 自带的 elevation 阴影在浅色底上几乎看不见：手绘一层往下坠的实影
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.20f),
+                    topLeft = Offset(0f, 6.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(22.dp.toPx()),
+                )
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.14f),
+                    topLeft = Offset(0f, 12.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(22.dp.toPx()),
+                )
+            }
+            .background(bg, RoundedCornerShape(22.dp))
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
-        Text("七日最大风速 · 点日期看当天曲线", fontSize = 12.sp, color = cs.onTertiaryContainer.copy(alpha = 0.75f))
+        Text("七日最大风速 · 点日期看当天曲线", fontSize = 12.sp, color = fg.copy(alpha = 0.75f))
         Spacer(Modifier.height(8.dp))
         for ((i, d) in days.withIndex()) {
             val open = expanded == d.date
@@ -1044,16 +1137,16 @@ private fun DailyCard(days: List<DayPoint>) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        weekLabel(d.date),
+                        dayLabel(d.date),
                         fontSize = 14.sp,
                         fontWeight = if (open) FontWeight.SemiBold else FontWeight.Normal,
-                        color = cs.onTertiaryContainer,
+                        color = fg,
                         modifier = Modifier.width(52.dp),
                     )
                     Text(
                         dirName(d.dir) + "风",
                         fontSize = 11.sp,
-                        color = cs.onTertiaryContainer.copy(alpha = 0.7f),
+                        color = fg.copy(alpha = 0.7f),
                         modifier = Modifier.width(48.dp),
                     )
                     Box(Modifier.weight(1f)) { SpeedBar(d, globalMax) }
@@ -1061,7 +1154,7 @@ private fun DailyCard(days: List<DayPoint>) {
                     Text(
                         "${fmt1(d.min100)}/${fmt1(d.max100)}",
                         fontSize = 12.sp,
-                        color = cs.onTertiaryContainer,
+                        color = fg,
                         modifier = Modifier.width(72.dp),
                         textAlign = TextAlign.End,
                     )
@@ -1078,13 +1171,13 @@ private fun DailyCard(days: List<DayPoint>) {
                         selection = selIndex,
                         onSelect = { selIndex = it },
                         accent = cs.primary,
-                        sub = cs.onTertiaryContainer.copy(alpha = 0.6f),
+                        sub = fg.copy(alpha = 0.6f),
                         height = 150.dp,
                     )
                     Text(
                         "当天最大 ${fmt1(d.max100)} m/s · ${d.atHour.ifEmpty { "--" }} · 阵风 ${fmt1(d.gust10)} m/s",
                         fontSize = 11.sp,
-                        color = cs.onTertiaryContainer.copy(alpha = 0.7f),
+                        color = fg.copy(alpha = 0.7f),
                     )
                 }
             }
@@ -1093,7 +1186,7 @@ private fun DailyCard(days: List<DayPoint>) {
                     Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(cs.onTertiaryContainer.copy(alpha = 0.10f)),
+                        .background(fg.copy(alpha = 0.10f)),
                 )
             }
         }
@@ -1134,7 +1227,26 @@ private fun DetailsCard(data: WindData, use100: Boolean, bg: Color, fg: Color) {
     Column(
         Modifier
             .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(22.dp))
+            .shadow(
+                7.dp, RoundedCornerShape(22.dp),
+                ambientColor = Color.Black.copy(alpha = 0.95f),
+                spotColor = Color.Black.copy(alpha = 0.95f),
+            )
+            .drawBehind {
+                // Compose 自带的 elevation 阴影在浅色底上几乎看不见：手绘一层往下坠的实影
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.20f),
+                    topLeft = Offset(0f, 6.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(22.dp.toPx()),
+                )
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.14f),
+                    topLeft = Offset(0f, 12.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(22.dp.toPx()),
+                )
+            }
             .background(bg, RoundedCornerShape(22.dp))
             .padding(16.dp),
     ) {
