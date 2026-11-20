@@ -17,6 +17,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -593,13 +594,13 @@ private fun HeroCard(data: WindData, use100: Boolean) {
                     ambientColor = Color.Black.copy(alpha = 0.92f),
                     spotColor = Color.Black.copy(alpha = 0.92f),
                 )
-                .background(cs.secondaryContainer, RoundedCornerShape(50))
+                .background(cs.primaryContainer, RoundedCornerShape(50))
                 .padding(horizontal = 14.dp, vertical = 7.dp),
         ) {
             Text(
                 machineStatus(mainSpeed),
                 fontSize = 12.sp,
-                color = cs.onSecondaryContainer,
+                color = cs.onPrimaryContainer,
                 fontWeight = FontWeight.Medium,
             )
         }
@@ -656,7 +657,9 @@ private fun FloatingHeightSwitch(
                 spotColor = Color.Black.copy(alpha = 0.95f),
             )
             .clip(shape)
-            .background(cs.primaryContainer, shape)
+            // 玻璃感：半透明底色透出背后渐变，再压一道白色高光边
+            .background(cs.primaryContainer.copy(alpha = 0.88f), shape)
+            .border(1.dp, Color.White.copy(alpha = 0.55f), shape)
             .padding(4.dp),
     ) {
         Pill("地面 3 m", !use100) { onToggleHeight(false) }
@@ -671,7 +674,7 @@ private fun Pill(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
             .clip(shape)
-            .background(if (selected) cs.primary.copy(alpha = 0.14f) else Color.Transparent, shape)
+            .background(if (selected) cs.primary.copy(alpha = 0.22f) else Color.Transparent, shape)
             .clickable { onClick() }
             .padding(horizontal = 14.dp, vertical = 6.dp),
     ) {
